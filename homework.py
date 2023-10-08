@@ -22,7 +22,7 @@ ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
 
-HOMEWORK_STATUSES = {
+HOMEWORK_VERDICTS = {
     'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
     'reviewing': 'Работа взята на проверку ревьюером.',
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
@@ -45,7 +45,6 @@ def send_message(bot, message):
         logger.debug('Бот отправил сообщение в чат')
     except telegram.error.TelegramError as error:
         logger.error(f'Сбой при отправке сообщения в чат - {error}')
-        raise Exception(error)
 
 
 def get_api_answer(timestamp):
@@ -85,13 +84,17 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """Извлекает из информации о конкретном ДЗ его статус."""
-    homework_name = homework.get('homework_name')
-    homework_status = homework.get('status')
-    if homework_status not in HOMEWORK_STATUSES:
-        raise KeyError('Полученный статус Д-З не документирован')
-    verdict = HOMEWORK_STATUSES[homework_status]
-    return f'Изменился статус проверки работы "{homework_name}". {verdict}'
+    """Извлекает статус домашней работы."""
+    try:
+        homework_name = str(homework['homework_name'])
+    except KeyError:
+        raise KeyError('Ошибка ключа "homework_name"')
+    status = homework.get('status')
+    if status not in HOMEWORK_VERDICTS:
+        raise KeyError('Статус не найден')
+    if homework['status'] in HOMEWORK_VERDICTS:
+        verdict = str(HOMEWORK_VERDICTS[homework['status']])
+        return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def check_tokens():

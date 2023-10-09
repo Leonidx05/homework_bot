@@ -41,6 +41,7 @@ logger.addHandler(handler)
 def send_message(bot, message):
     """Отправка сообщений ботом в телеграмм."""
     try:
+        logger.info('Бот отправит сообщение в чат через 3..2..1..')
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.debug('Бот отправил сообщение в чат')
     except telegram.error.TelegramError as error:
@@ -57,10 +58,10 @@ def get_api_answer(timestamp):
             params=payload,
         )
     except requests.exceptions.RequestException as error:
-        raise Exception(f'Ошибка при запросе к API: {error}')
+        raise Exception(f'Ошибка при запросе к API: {error}, {payload}')
     if homework_statuses.status_code != HTTPStatus.OK:
         raise requests.exceptions.StatusCodeException(
-            'Неверный код ответа API'
+            f'Неверный код ответа API:{homework_statuses.status_code}'
         )
     try:
         return homework_statuses.json()
@@ -71,12 +72,13 @@ def get_api_answer(timestamp):
 def check_response(response):
     """Проверяет корректность ответа API и возвращает список домашних работ."""
     if not isinstance(response, dict):
-        raise TypeError('Ответ API не словарь')
+        raise TypeError(f'Ответ API не словарь, а {type(response)}')
     check_list_homeworks = response.get('homeworks')
     if check_list_homeworks is None:
         raise KeyError('Ключ "homeworks" не доступен')
     if not isinstance(check_list_homeworks, list):
-        raise TypeError('Ответ API  оключу "homeworks" не список')
+        raise TypeError(f'Ответ API  по ключу "homeworks"'
+                        f'не список, а  {type(response)}')
     if len(check_list_homeworks) > 0:
         return check_list_homeworks
     else:
@@ -119,23 +121,18 @@ def main():
     while True:
         try:
             response = get_api_answer(current_timestamp)
-            if isinstance(response, dict):
-                check_response_hw = check_response(response)
-                if isinstance(check_response_hw, list):
-                    for hw in check_response_hw:
-                        if isinstance(response, dict):
-                            message = parse_status(hw)
-                            send_message(bot, message)
-                        else:
-                            logger.error('Домашняя работа не словарь')
+            check_response_hw = check_response(response)
+            for hw in check_response_hw:
+                message = parse_status(hw)
+                send_message(bot, message)
             else:
                 logger.error('Ответ API.Yandex не корректен')
-            current_timestamp = response.get('current_date')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
             send_message(bot, message)
-        time.sleep(RETRY_PERIOD)
+        finally:
+            time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
